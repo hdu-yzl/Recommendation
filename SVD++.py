@@ -17,20 +17,20 @@ lr = 0.01
 d = 20
 # Iteration number
 T = 100
-with open("D:\Recommendation\learning_plan\slides_2\\4.SVD++\ml-100k\\ua.base.explicit", 'r') as k:
+with open("D:\Recommendation\Recommendation_Learning\slides_2\\4.SVD++\ml-100k\\ua.base.explicit", 'r') as k:
     for line in k.readlines():
         user, item, rating, z = line.split('	')
         r_ui[int(user) - 1][int(item) - 1] = int(rating)
         if rating:
             y_ui[int(user) - 1][int(item) - 1] = 1
-with open("D:\Recommendation\learning_plan\slides_2\\4.SVD++\ml-100k\\ua.base.implicit", 'r') as k:
+with open("D:\Recommendation\Recommendation_Learning\slides_2\\4.SVD++\ml-100k\\ua.base.implicit", 'r') as k:
     for line in k.readlines():
         user, item, rating, z = line.split('	')
         Ius_[int(user) - 1][int(item) - 1] = int(rating)
 
 rm_ = np.zeros((n, m), int)
 rm_p = np.zeros((n, m), float)  # 保存预测值
-with open("D:\Recommendation\learning_plan\slides_2\\4.SVD++\ml-100k\\ua.test", 'r') as k:
+with open("D:\Recommendation\Recommendation_Learning\slides_2\\4.SVD++\ml-100k\\ua.test", 'r') as k:
     for line in k.readlines():
         user, item, rating, _ = line.split('	')
         rm_[int(user) - 1][int(item) - 1] = int(rating)
@@ -88,17 +88,18 @@ def predict(i, j):
     for x in range(len(Iu_)):
         if Iu_[x]:
             u1 += Wik[x]
-    Uu_ = u1 / s1
-    return bu[i] + bi[j] + np.dot(Uuk[i], Vik[j].T) + u + np.dot(Uu_, Vik[j].T)
+    Uu_ = u1 * s1
+    return bu[i] + bi[j] + np.dot(Uuk[i], Vik[j].T) + u + np.dot(Uu_, Vik[j].T), Uu_
 
 
 def gradient(i, j):
-    e_ui = r_ui[i][j] - predict(i, j)
+    e_ui, Uu_ = predict(i, j)
+    e_ui = r_ui[i][j] - e_ui
     __u = -e_ui
     __bu = -e_ui + Bu * bu[i]
     __bi = -e_ui + Bv * bi[j]
     __Uu = -e_ui * Vik[j] + au * Uuk[i]
-    __Vi = -e_ui * Uuk[i] + av * Vik[j]
+    __Vi = -e_ui * (Uuk[i]+Uu_) + av * Vik[j]
     __Wi = -e_ui * s1 * Vik[j] + aw * Wik[j]
     return __u, __bu, __bi, __Uu, __Vi, __Wi
 
@@ -115,7 +116,7 @@ def model_test():
     for i in range(n):
         for j in range(m):
             if rm_[i][j] != 0:
-                rm_p[i][j] = predict(i, j)
+                rm_p[i][j] , _ = predict(i, j)
     print("MAE:%s ,RMSE:%s" % (MAE(rm_, rm_p, r), RMSE(rm_, rm_p, r)))
 
 
