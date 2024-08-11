@@ -1,5 +1,6 @@
 import numpy as np
 import math
+from Evaluation import ca_test
 
 # learning rate
 lr = 0.01
@@ -35,18 +36,20 @@ bu = np.zeros(n, float)
 bi = np.zeros(m, float)
 # average rating value
 ru_ = None
-Iu = np.zeros((n, m), int)  # 不确定
 # global average rating value
 u_ = None
-with open("ml-100k/ua.base.explicit", 'r') as k:
+with open("ml-100k/u1.base.explicit", 'r') as k:
     for line in k.readlines():
         user, item, rating, z = line.split('	')
         r_ui[int(user) - 1][int(item) - 1] = int(rating)
         if rating:
             y_ui_[int(user) - 1][int(item) - 1] = 1
 
-r_ui_p_yui = np.zeros((n, m), int)  # 测试数据的yui矩阵
-
+r_ui_t_yui = np.zeros((n, m))  # 测试数据的yui矩阵
+r_ui_p_ui = np.zeros((n, m))  # 预测矩阵
+U_te = np.zeros(n)  # 测试用户
+U_te_num = 0  # 测试用户数
+K = 5
 
 def sigmoid(x):
     return 1. / (1 + np.exp(-x))
@@ -142,7 +145,7 @@ def predict(u, i):
 
 def gradient(u, i, yui):
     rui_ = predict(u, i)
-    # print(rui_)
+    #print(rui_)
     U_u_MPC, I_u_1, I_u_2, I_u_3, I_u_4, I_u_5 = ca_U_u_MPC(u, i)
     _Mi_r_1 = _Mi_r_2 = _Mi_r_3 = _Mi_r_4 = _Mi_r_5 = np.zeros(d, float)
     e_ui = (1 - sigmoid(rui_ * yui)) * yui
@@ -180,43 +183,66 @@ def update(u, i, yui):
     Mi_r[i][4] -= lr * _Mi_r_5
 
 
+r_ui_implicit = []
+with open("ml-100k/u1.base.implicit", 'r') as k:
+    for line in k.readlines():
+        user, item, rating, z = line.split('	')
+        r_ui_implicit.append([int(user) - 1, int(item) - 1, -1])
+
 def train():
     global lr, S_N, S_P
     for t in range(T):
         S_N_new = S_N
-        with open("ml-100k/ua.base.implicit", 'r') as k:
-            for line in k.readlines():
-                rd = np.random.randint(0, 7)
-                if rd < 6:
-                    user, item, rating, z = line.split('	')
-                    S_N_new = np.vstack([S_N_new, [int(user) - 1, int(item) - 1, -1]])
+        for i in range(len(r_ui_implicit)):
+            rd = np.random.randint(0, 5)
+            if rd < 4:
+                S_N_new = np.vstack([S_N_new, r_ui_implicit[i]])
         S = np.vstack([S_P, S_N_new])
         len_S = len(S)
-
         for t2 in range(len_S):
             k1 = np.random.randint(0, len_S)
             u, i, yui = S[k1]
             gradient(u, i, yui)
             update(u, i, yui)
+        model_test()
         lr *= 0.9
-        #测试
-        k1 = np.random.randint(0, len_S)
-        u, i, yui = S[k1]
-        print(predict(u,i))
+
 
 
 def load_test_data():
-    with open("D:\Recommendation\learning_plan\slides_3\\1.CCR\ml-100k\\ua.test", 'r') as k:
+    global ru_
+    global U_te_num
+    with open("ml-100k\\u1.test", 'r') as k:
         for line in k.readlines():
             user, item, rating, z = line.split('	')
-            if int(rating) == 0:
-                continue
-            if int(rating) >= u_[user]:
-                r_ui_p_yui[int(user) - 1][int(item) - 1] = 1
+            if int(rating) >= ru_[int(user) - 1]:
+                r_ui_t_yui[int(user) - 1][int(item) - 1] = 1
             else:
-                r_ui_p_yui[int(user) - 1][int(item) - 1] = -1
+                r_ui_t_yui[int(user) - 1][int(item) - 1] = -1
+
+    for i in range(n):
+        if np.count_nonzero(r_ui_t_yui[i]):
+            U_te[i] = 1
+            U_te_num += 1
+
+y_ui_train = np.zeros((n,m))
+with open("ml-100k/u1.base.explicit", 'r') as k:
+    for line in k.readlines():
+        user, item, rating, z = line.split('	')
+        y_ui_train[int(user) - 1][int(item) - 1] = 1
+
+def model_test():
+    for user in range(n):
+        for item in range(m):
+            if y_ui_train[user][item] == 0:
+                r_ui_p_ui[user][item] = predict(user, item)
+            else:
+                r_ui_p_ui[user][item] = np.NINF
+    np.save('r_ui_p_ui', r_ui_p_ui)
+    ca_test(r_ui_p_ui, r_ui_t_yui, K, U_te, U_te_num)
 
 
 if __name__ == "__main__":
     initial()
+    load_test_data()
     train()
